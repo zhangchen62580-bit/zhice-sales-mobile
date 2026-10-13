@@ -119,3 +119,38 @@ $$('nav button').forEach(button => button.addEventListener('click', () => nav(bu
 $$('[data-jump]').forEach(button => button.addEventListener('click', () => nav(button.dataset.jump)));
 renderQuick();
 chars();
+
+const recognitionCatalog = [
+  { type:'企业认定', name:'科技型中小企业', tags:'科小 科技型 评价', condition:'在中国境内注册；通常要求科技人员、研发活动和创新能力符合评价口径；具体指标以2026年度评价通知及属地平台为准。', time:'2026年度：按科技部门/属地平台通知申报；当年入库，有效期通常1年。', price:'官方评价通常不收取认定费；审计、咨询、材料整理等第三方费用另计。', value:'可作为研发加计扣除、项目申报和后续创新型/专精特新培育的基础。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'企业认定', name:'创新型中小企业', tags:'创新型 评价 直通车', condition:'按创新能力、成长性、专业化等指标评价；部分企业可按直通条件申报，需以当年平台规则核验。', time:'2026年度时间由省市主管部门发布；材料提交后通常需等待审核、公示。', price:'认定申请本身通常不收费；审计、咨询和知识产权等准备成本不等同于官方收费。', value:'处于优质中小企业梯度前置层级，可衔接专精特新中小企业申报。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'企业认定', name:'高新技术企业', tags:'高新 高企 税收', condition:'需满足知识产权、科技人员、研发费用、高新技术产品收入和企业所得税等综合条件，不能只看专利数量。', time:'2026年度申报批次、受理时间和复审安排以所在地科技/税务部门通知为准；有效期通常3年。', price:'文档参考：年收入1000万元以下审计报告约2000—2500元/本；服务费、专项审计费按企业情况另核。', value:'符合条件时可享受高新技术企业相关税收政策，并增强项目、融资和客户背书；税率和适用条件需按现行税法核验。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'企业认定', name:'专精特新中小企业', tags:'专精特新 省级 认定', condition:'重点看细分市场、主营产品、研发投入、知识产权、营收、人员和合规数据的一致性；2026新办法及属地细则要分别核对。', time:'2026年度各省市分批发布；从提交到结果通常按当地流程，文档参考下证约3—5个月。', price:'文档参考服务费约1.5万元；官方认定是否收费以当年通知为准，审计/IP/整改等成本另计。', value:'可对接地方奖励、项目申报、融资授信、招投标背书和技改研发项目，但地方金额不能全国套用。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'企业认定', name:'专精特新“小巨人”', tags:'小巨人 国家级', condition:'须先具备省级专精特新中小企业基础，按2026新办法核对营收、研发、知识产权、主导产品和数据真实性等指标。', time:'2026年度公开线上填报时间为4月25日至5月25日；申请和复核不收费；有效期和复核按工信部规则执行。', price:'官方申请不收费；第三方服务、审计和材料准备费用不等同于官方收费。', value:'国家级产业链、创新攻关、融资和项目资源对接价值更强，但不承诺必得补贴或项目。', source:'https://www.miit.gov.cn/jgsj/qyj/wjfb/art/2026/art_83857a4773ac4583bd1540eeb78bcbcb.html' },
+  { type:'资质认定', name:'ISO三体系认证', tags:'ISO 9001 14001 45001', condition:'需要建立并运行质量、环境、职业健康安全管理体系，准备制度、记录、运行证据和现场审核。', time:'文档参考约25个工作日下证；实际取决于机构排期、企业规模和整改情况。', price:'按文档口径报价；带标/不带标价格需单独确认，不能只看低价。', value:'常用于客户准入、招投标、供应链审核和内部管理规范化。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'资质认定', name:'发明专利', tags:'专利 知识产权 发明', condition:'核心是新颖性、创造性和实用性；已公开技术可能影响新颖性，申请前要做检索和保密。', time:'授权周期通常较长；授权后有效期一般20年，具体以法律和缴费状态为准。', price:'文档参考电子申请官费3450元；委托代理、答复和加急服务另计，购买现成专利约2万元仅作文档参考。', value:'可支撑核心技术、研发项目、产品竞争力和高企/专精特新材料，但必须与主导产品和研发活动匹配。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'资质认定', name:'实用新型专利', tags:'专利 实用新型', condition:'适用于产品结构、构造或其结合的技术方案；软件本身通常不能直接申请实用新型。', time:'周期通常短于发明专利，具体以审查和代理进度为准；有效期一般10年。', price:'文档参考官费500元；代理/撰写购买价格约2000—3000元，仅作参考。', value:'适合补充产品结构类知识产权，但要核查权利稳定性和与主导产品的关联。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'资质认定', name:'软件著作权', tags:'软著 软件 知识产权', condition:'准备源程序、说明文档和权利主体材料；权属、版本和实际开发情况要一致。', time:'以登记受理和审查进度为准，不能承诺固定下证时间。', price:'文档参考申请服务费约800—1000元；是否含代理、加急和授权服务要先确认。', value:'可用于软件产品权属证明、项目申报、客户交付和知识产权组合建设。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'资质认定', name:'商标注册', tags:'商标 45类 品牌', condition:'准备商标图样、申请人资质和注册类别；共45类，提交前应做近似检索。', time:'官方审查按商标流程推进，实际时间受类别、补正和审查情况影响。', price:'官方规费、代理服务费按申请类别和渠道核算；自己网上提交通常更省代理费。', value:'用于品牌保护、市场拓展、政府采购和客户信任建设。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' },
+  { type:'资质认定', name:'ICP/电信增值业务许可证', tags:'ICP 许可证 网站', condition:'适用于相应互联网信息服务场景，需结合业务模式、主体资质、服务器和属地要求判断。', time:'2026年度办理时间按通信管理部门审核进度，以当地要求为准。', price:'不能按统一价直接报价，需先判断是ICP备案、ICP许可证还是其他增值电信业务许可。', value:'降低合规经营风险，支持网站、平台和线上业务正常开展。', source:'https://docs.qq.com/doc/DZnRZc0dUcURGbW1O' }
+];
+
+function renderCatalog() {
+  const list = $('#catalogList');
+  const meta = $('#catalogMeta');
+  if (!list) return;
+  const query = ($('#catalogSearch')?.value || '').trim().toLowerCase();
+  const type = $('#catalogType')?.value || 'all';
+  const rows = recognitionCatalog.filter(item => (type === 'all' || item.type === type) && [item.type,item.name,item.tags,item.condition,item.time,item.price,item.value].join(' ').toLowerCase().includes(query));
+  if (meta) meta.textContent = `数据更新：2026年10月13日 · 共 ${rows.length} 项 · 价格为资料参考价，地方政策和年度时间以官方最新通知为准`;
+  list.innerHTML = rows.length ? rows.map(item => `<article class="catalog-card"><div class="catalog-card-top"><span class="catalog-type">${escapeHtml(item.type)}</span><h3>${escapeHtml(item.name)}</h3></div><div class="catalog-grid"><div><b>申请条件</b><p>${escapeHtml(item.condition)}</p></div><div><b>2026时间/有效期</b><p>${escapeHtml(item.time)}</p></div><div><b>总体价格</b><p>${escapeHtml(item.price)}</p></div><div><b>主要价值</b><p>${escapeHtml(item.value)}</p></div></div><div class="catalog-tags">${escapeHtml(item.tags)} <a href="${item.source}" target="_blank" rel="noreferrer">查看资料来源</a></div></article>`).join('') : '<div class="card empty"><h3>暂时没有匹配内容</h3><p>换一个关键词，例如：专精特新、时间、价格、专利、ISO。</p></div>';
+}
+
+function initCatalog() {
+  if (!$('#catalogList')) return;
+  $('#catalogSearch')?.addEventListener('input', renderCatalog);
+  $('#catalogType')?.addEventListener('change', renderCatalog);
+  renderCatalog();
+  $$('nav button[data-view="catalog"]').forEach(button => button.addEventListener('click', renderCatalog));
+}
+
+initCatalog();
