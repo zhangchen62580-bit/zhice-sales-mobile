@@ -105,7 +105,7 @@ async function generateByApi() {
 
 $('#date') && ($('#date').textContent = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }));
 $('#customer')?.addEventListener('input', chars);
-$('#go')?.addEventListener('click', generateByApi);
+$('#go')?.addEventListener('click', generateWithMemory);
 $('#sample')?.addEventListener('click', () => {
   $('#customer').value = '我们想做专精特新，主要看哪些条件？';
   chars();
@@ -155,4 +155,123 @@ function initCatalog() {
 }
 
 initCatalog();
+
+
+let activeClientId = localStorage.getItem('zhice-active-client') || '';
+let memoryToken = localStorage.getItem('zhice-memory-token') || '';
+const memoryApi = 'https://zhice-sales.zhangchen62580.workers.dev';
+
+async function memoryFetch(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (memoryToken) headers['x-access-token'] = memoryToken;
+  const response = await fetch(`${memoryApi}${path}`, { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `记忆接口错误 ${response.status}`);
+  return data;
+}
+
+function setMemoryStatus(text, good = false) {
+  const node = $('#memoryStatus');
+  if (node) { node.textContent = text; node.classList.toggle('good', good); }
+}
+
+async function loadClients() {
+  if (!memoryToken) { setMemoryStatus('请输入访问码同步客户'); return; }
+  try {
+    const clients = await memoryFetch('/api/clients');
+    const select = $('#clientSelect');
+    if (!select) return;
+    select.innerHTML = '<option value="">选择客户对话</option>' + clients.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}${c.company ? ` · ${escapeHtml(c.company)}` : ''}</option>`).join('');
+    if (activeClientId && clients.some(c => c.id === activeClientId)) select.value = activeClientId;
+    setMemoryStatus(`已连接云端 · ${clients.length} 个客户`, true);
+    if (activeClientId) await loadClientMemory(activeClientId);
+  } catch (error) { setMemoryStatus(error.message); }
+}
+
+async function createMemoryClient() {
+  if (!memoryToken) return toast('先输入工作台访问码');
+  const name = ($('#newClientName')?.value || '').trim() || window.prompt('请输入客户名称');
+  if (!name) return;
+  const company = ($('#newClientCompany')?.value || '').trim();
+  try {
+    const client = await memoryFetch('/api/clients', { method:'POST', body:JSON.stringify({ name, company, tags:['网站对话'] }) });
+    activeClientId = client.id; localStorage.setItem('zhice-active-client', activeClientId);
+    await loadClients();
+    if ($('#clientSelect')) $('#clientSelect').value = activeClientId;
+    toast('已建立独立客户对话');
+  } catch (error) { toast(error.message); }
+}
+
+function renderClientMemory(data) {
+  const insight = data?.insight;
+  const summary = $('#memorySummary');
+  if (summary) summary.innerHTML = insight ? `<b>客户总结</b><p>${escapeHtml(insight.summary)}</p><b>成交策略</b><p>${escapeHtml(insight.strategy)}</p>` : '这位客户还没有 AI 复盘，完成一次对话后会自动沉淀。';
+  const objections = $('#memoryObjections');
+  if (objections) objections.innerHTML = (data?.objections || []).length ? `<h4>客户异议</h4>` + data.objections.map(o => `<article><span>${escapeHtml(o.category)}</span><p>客户：${escapeHtml(o.objection)}</p><small>改进回复：${escapeHtml(o.suggested_reply)}</small></article>`).join('') : '<h4>客户异议</h4><p>暂未识别到异议。</p>';
+  renderObjections(data?.objections || []);
+}
+
+function renderObjections(items) {
+  const node = $('#objections');
+  if (!node) return;
+  node.innerHTML = items.length ? items.map(o => `<article class="card objection-item"><span class="tag">${escapeHtml(o.category)}</span><h3>客户原话/顾虑</h3><p>${escapeHtml(o.objection)}</p><h4>下一次改进回复</h4><p>${escapeHtml(o.suggested_reply)}</p></article>`).join('') : '<div class="card empty"><h3>选择客户后，这里会显示真实异议</h3><p>每次生成回复后，系统会重新分析整段对话，识别价格、信任、条件、时间、效果和决策人等障碍。</p></div>';
+}
+
+async function loadMemoryLibrary() {
+  const node = $('#memoryLibrary');
+  if (!memoryToken) return;
+  try {
+    const items = await memoryFetch('/api/library');
+    if (node) node.innerHTML = items.length ? `<h4>API沉淀素材</h4>` + items.slice(0, 12).map(item => `<article><span>${escapeHtml(item.category)}</span><b>${escapeHtml(item.title)}</b><p>${escapeHtml(item.body)}</p><small>更新：${escapeHtml(item.updated_at)}</small></article>`).join('') : '<p>完成客户复盘后，素材库会自动生成可复用话术。</p>';
+  } catch (error) { if (node) node.innerHTML = `<p>素材库暂时无法读取：${escapeHtml(error.message)}</p>`; }
+}
+
+async function loadClientMemory(clientId = activeClientId) {
+  if (!clientId || !memoryToken) return;
+  try { const data = await memoryFetch(`/api/clients/${encodeURIComponent(clientId)}`); renderClientMemory(data); } catch (error) { setMemoryStatus(error.message); }
+}
+
+async function saveConversationMessage(clientId, role, text) {
+  if (!clientId || !memoryToken || !text) return;
+  return memoryFetch(`/api/clients/${encodeURIComponent(clientId)}/messages`, { method:'POST', body:JSON.stringify({ role, text }) });
+}
+
+async function generateWithMemory() {
+  const input = $('#customer');
+  const customerText = input?.value.trim();
+  if (!customerText) return toast('先把客户原话放进来');
+  if (!activeClientId) {
+    if (!memoryToken) return toast('先输入访问码，再新建或选择客户');
+    await createMemoryClient();
+    if (!activeClientId) return;
+  }
+  const style = mode === 'warm' ? '温和有分寸' : mode === 'short' ? '短一点' : '专业、自然、直接';
+  const button = $('#go'); if (button) { button.disabled = true; button.dataset.oldText = button.textContent; button.textContent = '正在生成并沉淀…'; }
+  try {
+    await saveConversationMessage(activeClientId, 'customer', customerText);
+    const response = await fetch(`${memoryApi}/api/online-generate`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ customerText, style, biz: $('#biz')?.value || 'auto', clientId: activeClientId }) });
+    const data = await response.json(); if (!response.ok) throw new Error(data.error || '在线 API 失败');
+    const content = data.content || '';
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>生成方式：</b>${data.online ? '在线知识库 + 旧网站逻辑 + 客户沉淀' : '旧网站兜底逻辑'}</p><span class="tag">${data.online ? '已在线分析' : '已离线兜底'}</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
+    $('#copyReply').onclick = () => copy(content);
+    await saveConversationMessage(activeClientId, 'assistant', content);
+    const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' });
+    renderClientMemory({ insight, objections: insight.objections || [] });
+    toast('回复已生成，客户对话和异议已自动沉淀');
+  } catch (error) {
+    const content = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>回复判断</h4><p><b>生成方式：</b>旧网站完整逻辑兜底</p><span class="tag">API暂时不可用，已离线接管</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
+    $('#copyReply').onclick = () => copy(content);
+    try { await saveConversationMessage(activeClientId, 'assistant', content); const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' }); renderClientMemory({ insight, objections: insight.objections || [] }); } catch (_) {}
+    toast('在线 API 暂时不可用，已使用旧网站逻辑并完成沉淀');
+  } finally { if (button) { button.disabled = false; button.textContent = button.dataset.oldText || '生成逻辑回复'; } }
+}
+
+$('#saveMemoryToken')?.addEventListener('click', () => { memoryToken = ($('#memoryToken')?.value || '').trim(); if (memoryToken) { localStorage.setItem('zhice-memory-token', memoryToken); loadClients(); loadMemoryLibrary(); } });
+$('#createClient')?.addEventListener('click', createMemoryClient);
+$('#clientSelect')?.addEventListener('change', async event => { activeClientId = event.target.value; localStorage.setItem('zhice-active-client', activeClientId); await loadClientMemory(activeClientId); });
+$('#refreshMemory')?.addEventListener('click', () => loadClientMemory());
+if ($('#memoryToken') && memoryToken) $('#memoryToken').value = memoryToken;
+loadClients();
+loadMemoryLibrary();
 
