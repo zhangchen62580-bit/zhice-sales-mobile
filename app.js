@@ -161,6 +161,16 @@ let activeClientId = localStorage.getItem('zhice-active-client') || '';
 let memoryToken = localStorage.getItem('zhice-memory-token') || '';
 const memoryApi = 'https://zhice-sales.zhangchen62580.workers.dev';
 
+function readMemoryToken() {
+  const input = $('#memoryToken');
+  const typed = input ? input.value.replace(/\s+/g, '') : '';
+  if (typed) {
+    memoryToken = typed;
+    localStorage.setItem('zhice-memory-token', memoryToken);
+  }
+  return memoryToken;
+}
+
 async function memoryFetch(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (memoryToken) headers['x-access-token'] = memoryToken;
@@ -189,7 +199,7 @@ async function loadClients() {
 }
 
 async function createMemoryClient() {
-  if (!memoryToken) return toast('先输入工作台访问码');
+  if (!readMemoryToken()) return toast('先输入工作台访问码，再点连接记忆或新建客户');
   const name = ($('#newClientName')?.value || '').trim() || window.prompt('请输入客户名称');
   if (!name) return;
   const company = ($('#newClientCompany')?.value || '').trim();
@@ -241,7 +251,7 @@ async function generateWithMemory() {
   const customerText = input?.value.trim();
   if (!customerText) return toast('先把客户原话放进来');
   if (!activeClientId) {
-    if (!memoryToken) return toast('先输入访问码，再新建或选择客户');
+    if (!readMemoryToken()) return toast('先输入访问码，再新建或选择客户');
     await createMemoryClient();
     if (!activeClientId) return;
   }
@@ -267,7 +277,8 @@ async function generateWithMemory() {
   } finally { if (button) { button.disabled = false; button.textContent = button.dataset.oldText || '生成逻辑回复'; } }
 }
 
-$('#saveMemoryToken')?.addEventListener('click', () => { memoryToken = ($('#memoryToken')?.value || '').trim(); if (memoryToken) { localStorage.setItem('zhice-memory-token', memoryToken); loadClients(); loadMemoryLibrary(); } });
+$('#saveMemoryToken')?.addEventListener('click', async () => { if (readMemoryToken()) { await loadClients(); await loadMemoryLibrary(); } else toast('请输入工作台访问码'); });
+$('#memoryToken')?.addEventListener('keydown', event => { if (event.key === 'Enter') $('#saveMemoryToken')?.click(); });
 $('#createClient')?.addEventListener('click', createMemoryClient);
 $('#clientSelect')?.addEventListener('change', async event => { activeClientId = event.target.value; localStorage.setItem('zhice-active-client', activeClientId); await loadClientMemory(activeClientId); });
 $('#refreshMemory')?.addEventListener('click', () => loadClientMemory());
