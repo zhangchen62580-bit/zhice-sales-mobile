@@ -1,0 +1,6 @@
+cloudflare-worker/.wrangler/
+cloudflare-worker/ACCESS_CODE.txt
+*.env
+data/
+tools/
+
