@@ -75,15 +75,9 @@ async function generateByApi() {
   }
   try {
     const localContent = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
-    const response = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerText, style, province })
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || 'API 请求失败');
+    const data = { model: 'legacy-local' };
     const content = localContent;
-    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>说话方式：</b>${escapeHtml(style)}</p><p><b>省份口径：</b>${escapeHtml(province)}</p><p><b>生成方式：</b>${data.model === 'local-specialty' ? '专精特新专业规则' : '企服销售规则 API'}</p><span class="tag">新逻辑</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>说话方式：</b>${escapeHtml(style)}</p><p><b>省份口径：</b>${escapeHtml(province)}</p><p><b>生成方式：</b>旧网站完整回复逻辑</p><span class="tag">老逻辑已迁移</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
     $('#copyReply').onclick = () => copy(content);
     toast('已按新销售逻辑生成');
   } catch (error) {
