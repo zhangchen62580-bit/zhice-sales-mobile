@@ -217,8 +217,13 @@ function renderClientMemory(data) {
   const summary = $('#memorySummary');
   if (summary) summary.innerHTML = insight ? `<b>客户总结</b><p>${escapeHtml(insight.summary)}</p><b>成交策略</b><p>${escapeHtml(insight.strategy)}</p>` : '这位客户还没有 AI 复盘，完成一次对话后会自动沉淀。';
   const objections = $('#memoryObjections');
-  if (objections) objections.innerHTML = (data?.objections || []).length ? `<h4>客户异议</h4>` + data.objections.map(o => `<article><span>${escapeHtml(o.category)}</span><p>客户：${escapeHtml(o.objection)}</p><small>改进回复：${escapeHtml(o.suggested_reply)}</small></article>`).join('') : '<h4>客户异议</h4><p>暂未识别到异议。</p>';
-  renderObjections(data?.objections || []);
+  const items = (data?.objections || []).map(normalizeObjection);
+  if (objections) objections.innerHTML = items.length ? `<h4>客户异议</h4>` + items.map(o => `<article><span>${escapeHtml(o.category)}</span><p>客户：${escapeHtml(o.objection)}</p><small>改进回复：${escapeHtml(o.suggested_reply)}</small></article>`).join('') : '<h4>客户异议</h4><p>暂未识别到异议。</p>';
+  renderObjections(items);
+}
+
+function normalizeObjection(item) {
+  return { category: item?.category || '未分类', objection: item?.objection || item?.text || '', suggested_reply: item?.suggested_reply || item?.suggestedReply || '' };
 }
 
 function renderObjections(items) {
@@ -267,12 +272,13 @@ async function generateWithMemory() {
     await saveConversationMessage(activeClientId, 'assistant', content);
     const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' });
     renderClientMemory({ insight, objections: insight.objections || [] });
+    await loadMemoryLibrary();
     toast('回复已生成，客户对话和异议已自动沉淀');
   } catch (error) {
     const content = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
     $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>回复判断</h4><p><b>生成方式：</b>旧网站完整逻辑兜底</p><span class="tag">API暂时不可用，已离线接管</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
     $('#copyReply').onclick = () => copy(content);
-    try { await saveConversationMessage(activeClientId, 'assistant', content); const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' }); renderClientMemory({ insight, objections: insight.objections || [] }); } catch (_) {}
+    try { await saveConversationMessage(activeClientId, 'assistant', content); const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' }); renderClientMemory({ insight, objections: insight.objections || [] }); await loadMemoryLibrary(); } catch (_) {}
     toast('在线 API 暂时不可用，已使用旧网站逻辑并完成沉淀');
   } finally { if (button) { button.disabled = false; button.textContent = button.dataset.oldText || '生成逻辑回复'; } }
 }
