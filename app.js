@@ -60,7 +60,7 @@ function renderQuick() {
   $$('[data-quick]').forEach(node => node.onclick = () => {
     $('#customer').value = node.querySelector('p').textContent.replace(/[“”]/g, '');
     chars();
-    generateByApi();
+    generateWithMemory();
   });
 }
 
@@ -77,7 +77,6 @@ async function generateByApi() {
     button.textContent = '正在生成…';
   }
   try {
-    const localContent = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
     const response = await fetch('https://zhice-sales.zhangchen62580.workers.dev/api/online-generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,16 +84,14 @@ async function generateByApi() {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '在线 API 生成失败');
-    const content = data.content || localContent;
-    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>说话方式：</b>${escapeHtml(style)}</p><p><b>省份口径：</b>${escapeHtml(province)}</p><p><b>生成方式：</b>${data.online ? '在线知识库 + 旧网站回复逻辑' : '旧网站完整回复逻辑（兜底）'}</p><span class="tag">${data.online ? '在线分析完成' : '离线兜底'}</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
+    const content = data.content;
+    if (!content || !data.online) throw new Error('在线 API 未返回有效回复');
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>说话方式：</b>${escapeHtml(style)}</p><p><b>省份口径：</b>${escapeHtml(province)}</p><p><b>生成方式：</b>在线知识库 + 客户历史沉淀</p><span class="tag">在线分析完成</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
     $('#copyReply').onclick = () => copy(content);
     toast('已按新销售逻辑生成');
   } catch (error) {
-    const content = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
-    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>回复判断</h4><p><b>生成方式：</b>旧网站本地回复逻辑</p><span class="tag">离线可用</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
-    $('#copyReply').onclick = () => copy(content);
-    toast('已使用旧网站本地回复逻辑');
-    toast(error.message || 'API 请求失败');
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>在线生成状态</h4><p>系统没有使用离线话术，正在等待在线 API。</p><span class="tag">在线连接异常</span></div><div class="reply"><h4>请检查网络后重试</h4><p>${escapeHtml(error.message || '在线 API 暂时没有返回内容。')}</p></div></div>`;
+    toast(error.message || '在线 API 暂时没有返回内容');
   } finally {
     if (button) {
       button.disabled = false;
@@ -109,7 +106,7 @@ $('#go')?.addEventListener('click', generateWithMemory);
 $('#sample')?.addEventListener('click', () => {
   $('#customer').value = '我们想做专精特新，主要看哪些条件？';
   chars();
-  generateByApi();
+  generateWithMemory();
 });
 $$('.modes button').forEach(button => button.addEventListener('click', () => {
   $$('.modes button').forEach(node => node.classList.remove('selected'));
@@ -255,8 +252,7 @@ async function generateWithMemory() {
   const input = $('#customer');
   const customerText = input?.value.trim();
   if (!customerText) return toast('先把客户原话放进来');
-  if (!activeClientId) {
-    if (!readMemoryToken()) return toast('先输入访问码，再新建或选择客户');
+  if (!activeClientId && readMemoryToken()) {
     await createMemoryClient();
     if (!activeClientId) return;
   }
@@ -266,8 +262,9 @@ async function generateWithMemory() {
     await saveConversationMessage(activeClientId, 'customer', customerText);
     const response = await fetch(`${memoryApi}/api/online-generate`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ customerText, style, biz: $('#biz')?.value || 'auto', clientId: activeClientId }) });
     const data = await response.json(); if (!response.ok) throw new Error(data.error || '在线 API 失败');
-    const content = data.content || '';
-    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>生成方式：</b>${data.online ? '在线知识库 + 旧网站逻辑 + 客户沉淀' : '旧网站兜底逻辑'}</p><span class="tag">${data.online ? '已在线分析' : '已离线兜底'}</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
+    const content = data.content;
+    if (!content || !data.online) throw new Error('在线 API 未返回有效回复');
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>销售判断</h4><p><b>生成方式：</b>在线知识库 + 客户历史沉淀</p><span class="tag">已在线分析</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
     $('#copyReply').onclick = () => copy(content);
     await saveConversationMessage(activeClientId, 'assistant', content);
     const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' });
@@ -275,11 +272,8 @@ async function generateWithMemory() {
     await loadMemoryLibrary();
     toast('回复已生成，客户对话和异议已自动沉淀');
   } catch (error) {
-    const content = `${policyIntro}\n\n结合您刚才说的：${legacyReply(customerText)}`;
-    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>回复判断</h4><p><b>生成方式：</b>旧网站完整逻辑兜底</p><span class="tag">API暂时不可用，已离线接管</span></div><div class="reply"><h4>客户回复文本</h4><p style="white-space:pre-wrap">${escapeHtml(content)}</p><button class="copy" id="copyReply">复制回复</button></div></div>`;
-    $('#copyReply').onclick = () => copy(content);
-    try { await saveConversationMessage(activeClientId, 'assistant', content); const insight = await memoryFetch(`/api/clients/${encodeURIComponent(activeClientId)}/consolidate`, { method:'POST' }); renderClientMemory({ insight, objections: insight.objections || [] }); await loadMemoryLibrary(); } catch (_) {}
-    toast('在线 API 暂时不可用，已使用旧网站逻辑并完成沉淀');
+    $('#result').innerHTML = `<div class="result-body"><div class="reason"><h4>在线生成状态</h4><p>系统没有使用离线话术，正在等待在线 API。</p><span class="tag">在线连接异常</span></div><div class="reply"><h4>请检查网络后重试</h4><p>${escapeHtml(error.message || '在线 API 暂时没有返回内容。')}</p></div></div>`;
+    toast(error.message || '在线 API 暂时没有返回内容');
   } finally { if (button) { button.disabled = false; button.textContent = button.dataset.oldText || '生成逻辑回复'; } }
 }
 
